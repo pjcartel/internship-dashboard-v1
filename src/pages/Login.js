@@ -1,25 +1,30 @@
-import { GoogleAuthProvider, signInWithPopup } from "firebase/auth";
+import { useState } from "react";
+import { signInWithEmailAndPassword } from "firebase/auth";
 import { auth } from "../firebase";
+import { useNavigate } from "react-router-dom";
 
 export default function Login() {
-  const provider = new GoogleAuthProvider();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const navigate = useNavigate();
 
-  const handleLogin = async () => {
+  const handleLogin = async (e) => {
+    e.preventDefault();
     try {
-      await signInWithPopup(auth, provider);
+      await signInWithEmailAndPassword(auth, email, password);
+      navigate("/dashboard");
     } catch (error) {
-      console.error("Login failed:", error);
+      alert(error.message);
     }
   };
 
   return (
-    <div className="flex flex-col items-center justify-center h-screen">
-      <h1 className="text-2xl font-bold mb-4">Internship Dashboard</h1>
-      <button 
-        onClick={handleLogin} 
-        className="bg-blue-500 text-white px-4 py-2 rounded">
-        Sign in with Google
-      </button>
-    </div>
+    <form onSubmit={handleLogin}>
+      <h2>Login</h2>
+      <input type="email" placeholder="Email" onChange={(e) => setEmail(e.target.value)} />
+      <input type="password" placeholder="Password" onChange={(e) => setPassword(e.target.value)} />
+      <button type="submit">Login</button>
+    </form>
   );
 }
+

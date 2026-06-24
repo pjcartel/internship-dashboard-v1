@@ -1,0 +1,23 @@
+import { useState } from "react";
+import Login from "./Login";
+import Dashboard from "./Dashboard";
+
+function App() {
+  const [user, setUser] = useState(null);
+
+  const logout = () => {
+    setUser(null);
+  };
+  
+    return (
+    <div>
+      {!user ? (
+        <Login setUser={setUser} />
+      ) : (
+        <Dashboard user={user} />
+      )}
+    </div>
+  );
+}
+
+export default App;
