@@ -1,73 +1,50 @@
-import React, { useState, useEffect } from "react";
-import { db } from "../firebase";
-import { collection, onSnapshot, query, orderBy } from "firebase/firestore";
+import AppShell from "../components/AppShell";
+import { useAppData } from "../context/AppDataContext";
+import { useAuth } from "../context/AuthContext";
 
 export default function Notifications() {
-  const [notifications, setNotifications] = useState([]);
-  const [openCategories, setOpenCategories] = useState({});
-
-  useEffect(() => {
-    const q = query(collection(db, "notifications"), orderBy("timestamp", "desc"));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      setNotifications(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    });
-    return () => unsubscribe();
-  }, []);
-
-  // Group notifications by category
-  const grouped = notifications.reduce((acc, note) => {
-    const cat = note.category || "General";
-    if (!acc[cat]) acc[cat] = [];
-    acc[cat].push(note);
-    return acc;
+  const { currentUser } = useAuth();
+  const { notifications, markNotificationRead, deleteNotification } = useAppData();
+  const visibleNotifications = notifications.filter(
+    (note) => note.recipientUid === "all" || note.recipientUid === currentUser.uid
+  );
+  const grouped = visibleNotifications.reduce((groups, note) => {
+    const category = note.category || "General";
+    groups[category] = groups[category] || [];
+    groups[category].push(note);
+    return groups;
   }, {});
 
-  const toggleCategory = (cat) => {
-    setOpenCategories(prev => ({ ...prev, [cat]: !prev[cat] }));
-  };
-
-  // Icon + color mapping
-  const categoryStyles = {
-    "Task Alerts": { icon: "📋", color: "bg-blue-300" },
-    "Feedback Alerts": { icon: "💬", color: "bg-green-300" },
-    "Resource Updates": { icon: "📂", color: "bg-orange-300" },
-    "General": { icon: "🔔", color: "bg-gray-300" }
-  };
-
   return (
-    <div className="p-6">
-      <h2 className="text-2xl font-bold mb-4">Notifications</h2>
-
-      {Object.keys(grouped).map((cat) => {
-        const { icon, color } = categoryStyles[cat] || categoryStyles["General"];
-        return (
-          <div key={cat} className="mb-6 border rounded shadow">
-            <button
-              onClick={() => toggleCategory(cat)}
-              className={`w-full text-left px-4 py-2 font-semibold flex justify-between items-center ${color}`}
-            >
-              <span>
-                {icon} {cat}
-              </span>
-              <span>{openCategories[cat] ? "▲" : "▼"}</span>
-            </button>
-
-            {openCategories[cat] && (
-              <ul className="p-4">
-                {grouped[cat].map((note) => (
-                  <li key={note.id} className="mb-3 border-b pb-2">
-                    <p className="font-semibold">{note.title}</p>
-                    <p className="text-sm text-gray-600">{note.message}</p>
-                    <p className="text-xs text-gray-400">
-                      {new Date(note.timestamp?.toDate()).toLocaleString()}
-                    </p>
-                  </li>
+    <AppShell title="Notifications" description="Review task alerts, feedback notes, resource updates, and read state.">
+      <section className="panel">
+        <div className="panel-header">
+          <div><h2>Updates</h2><p>{visibleNotifications.length} notifications</p></div>
+        </div>
+        <div className="notification-groups">
+          {Object.entries(grouped).map(([category, items]) => (
+            <section key={category} className="notification-group" aria-labelledby={`group-${category}`}>
+              <h3 id={`group-${category}`}>{category}</h3>
+              <div className="stack-list roomy">
+                {items.map((note) => (
+                  <article key={note.id} className={`notification-item ${note.read ? "read" : "unread"}`}>
+                    <div>
+                      <strong>{note.title}</strong>
+                      <span>{note.message}</span>
+                      <small>{new Date(note.createdAt).toLocaleString()}</small>
+                    </div>
+                    <div className="row-actions">
+                      <button className="button secondary" type="button" onClick={() => markNotificationRead(note.id)} disabled={note.read}>Mark read</button>
+                      <button className="button danger" type="button" onClick={() => deleteNotification(note.id)}>Delete</button>
+                    </div>
+                  </article>
                 ))}
-              </ul>
-            )}
-          </div>
-        );
-      })}
-    </div>
+              </div>
+            </section>
+          ))}
+          {visibleNotifications.length === 0 ? <p className="empty-state">No notifications for this account.</p> : null}
+        </div>
+      </section>
+    </AppShell>
   );
 }

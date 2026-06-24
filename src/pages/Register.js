@@ -1,65 +1,95 @@
-import React, { useState } from "react";
-import { auth, db } from "../firebase";
-import { createUserWithEmailAndPassword } from "firebase/auth";
-import { collection, addDoc } from "firebase/firestore";
+import { useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
+
+const initialForm = {
+  email: "",
+  password: "",
+  fullName: "",
+  department: "",
+  phone: "",
+  bio: "",
+};
 
 export default function Register() {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [form, setForm] = useState(initialForm);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+  const [loading, setLoading] = useState(false);
+  const { register } = useAuth();
+  const navigate = useNavigate();
 
-  const handleRegister = async (e) => {
-    e.preventDefault();
+  const updateField = (field, value) => {
+    setForm((current) => ({ ...current, [field]: value }));
+  };
 
-    // Restrict to work emails (example: softlink.com)
-    if (!email.endsWith("@softlink.com")) {
-      alert("Please use your work email to register");
+  const handleRegister = async (event) => {
+    event.preventDefault();
+    setError("");
+    setSuccess("");
+
+    if (!form.email.endsWith("@softlink.com")) {
+      setError("Use a Softlink work email address to register.");
       return;
     }
 
+    setLoading(true);
     try {
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      const user = userCredential.user;
-
-      // Save user info in Firestore
-      await addDoc(collection(db, "users"), {
-        email: user.email,
-        role: "intern", // default role
-      });
-
-      alert("Registration successful! You can now log in.");
-      setEmail("");
-      setPassword("");
-    } catch (error) {
-      alert(error.message);
+      await register(form);
+      setSuccess("Registration completed. Redirecting to the dashboard.");
+      setTimeout(() => navigate("/dashboard"), 600);
+    } catch (err) {
+      setError(err.message || "Registration failed. Try again.");
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <div className="flex flex-col items-center justify-center h-screen bg-gray-50">
-      <h1 className="text-2xl font-bold mb-4">Intern Registration</h1>
-      <form onSubmit={handleRegister} className="flex flex-col w-80 bg-white p-6 rounded shadow">
-        <input
-          type="email"
-          placeholder="Work Email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          className="mb-4 p-2 border rounded"
-        />
-        <input
-          type="password"
-          placeholder="Password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          className="mb-4 p-2 border rounded"
-        />
-        <button type="submit" className="bg-blue-500 text-white py-2 rounded hover:bg-blue-600">
-          Register
-        </button>
-      </form>
-      <p className="mt-4">
-        Already registered? <a href="/login" className="text-blue-500">Login here</a>
-      </p>
-    </div>
+    <main className="auth-page">
+      <section className="auth-panel wide" aria-labelledby="register-title">
+        <div className="auth-copy">
+          <div className="auth-logo">ID</div>
+          <h1 id="register-title">Create intern profile</h1>
+          <p>Register with a Softlink work email. New accounts start with the intern role.</p>
+        </div>
+
+        <form className="auth-form two-column" onSubmit={handleRegister}>
+          <div className="field-group">
+            <label htmlFor="fullName">Full name</label>
+            <input id="fullName" value={form.fullName} onChange={(event) => updateField("fullName", event.target.value)} required />
+          </div>
+          <div className="field-group">
+            <label htmlFor="department">Department</label>
+            <input id="department" value={form.department} onChange={(event) => updateField("department", event.target.value)} required />
+          </div>
+          <div className="field-group">
+            <label htmlFor="registerEmail">Work email</label>
+            <input id="registerEmail" type="email" value={form.email} onChange={(event) => updateField("email", event.target.value)} required />
+          </div>
+          <div className="field-group">
+            <label htmlFor="phone">Phone number</label>
+            <input id="phone" value={form.phone} onChange={(event) => updateField("phone", event.target.value)} />
+          </div>
+          <div className="field-group">
+            <label htmlFor="registerPassword">Password</label>
+            <input id="registerPassword" type="password" value={form.password} onChange={(event) => updateField("password", event.target.value)} required minLength={6} />
+          </div>
+          <div className="field-group wide-field">
+            <label htmlFor="bio">Personal bio</label>
+            <textarea id="bio" rows="4" value={form.bio} onChange={(event) => updateField("bio", event.target.value)} />
+          </div>
+
+          {error ? <p className="form-error wide-field" role="alert">{error}</p> : null}
+          {success ? <p className="form-success wide-field" role="status">{success}</p> : null}
+
+          <button className="button primary" type="submit" disabled={loading}>
+            {loading ? "Creating account" : "Register"}
+          </button>
+        </form>
+
+        <p className="auth-switch">Already registered? <Link to="/login">Sign in</Link></p>
+      </section>
+    </main>
   );
 }
-

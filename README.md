@@ -1,56 +1,110 @@
-# Internship Dashboard v1
+# Internship Dashboard Management System
 
-Internship Dashboard is a React and Firebase application for managing internship workflows. The main app supports registration and login, protected dashboard routes, task creation, feedback, analytics, user management, resource sharing, and notifications.
+A React and Firebase internship management platform for interns, supervisors, and administrators. The app centralizes internship tasks, feedback, resources, notifications, user roles, profile data, and analytics in one dashboard workspace.
 
-The repository also includes a local Express admin API, a standalone admin dashboard, and a Firebase Cloud Function for assigning user roles.
+The implementation follows the requirements in `/home/blkkk/Downloads/Internship Dashboard Management System.docx` and includes a local demo mode so the application can be reviewed without live Firebase credentials.
+
+## What It Does
+
+- Authenticates users with Firebase email/password sign-in and registration.
+- Provides protected routes with session-aware loading states.
+- Supports role-aware demo access for administrator, supervisor, and intern workflows.
+- Lets interns view assigned tasks, submit progress notes, access resources, view notifications, and manage their profile.
+- Lets supervisors create tasks, review work, add feedback, publish resources, and track progress.
+- Lets administrators manage users, assign roles, monitor analytics, manage resources, and oversee activity.
+- Tracks task status, feedback, resources, notifications, profiles, and users through a shared data model.
+- Provides analytics charts for task completion, feedback volume, resource categories, and users by role.
 
 ## Tech Stack
 
-- React 19 with Create React App
-- React Router for client-side routing
-- Firebase Authentication, Cloud Firestore, and Cloud Storage
-- Chart.js and `react-chartjs-2` for analytics views
-- Tailwind CSS through PostCSS
-- Express and Firebase Admin SDK for local admin APIs
+- React.js with Create React App
+- React Router DOM
+- Tailwind CSS and custom app CSS
+- Firebase Authentication
+- Firebase Firestore
+- Firebase Storage
+- Chart.js and `react-chartjs-2`
+- Express and Firebase Admin SDK in the optional local backend
 - Firebase Cloud Functions for server-side role assignment
 
 ## Project Structure
 
 ```text
 .
-|-- src/                    # Main internship dashboard React app
-|   |-- components/          # Shared route, navigation, and Firebase UI helpers
-|   |-- context/             # Auth context
-|   |-- pages/               # Login, register, dashboard, tasks, feedback, analytics, users, resources, notifications
-|   |-- utils/               # Notification helper functions
-|   `-- firebase.js          # Main client Firebase configuration
-|-- backend/                 # Local Express API backed by Firebase Admin SDK
+|-- src/
+|   |-- components/          # App shell, protected route, shared UI helpers
+|   |-- context/             # Auth state and app data state
+|   |-- data/                # Seed data for local demo mode
+|   |-- pages/               # Auth, dashboard, tasks, feedback, resources, notifications, users, analytics, profile
+|   |-- utils/               # Firebase notification helper
+|   `-- firebase.js          # Client Firebase services
+|-- backend/                 # Optional Express API using Firebase Admin SDK
 |-- functions/               # Firebase Cloud Functions codebase
-|-- admin-dashboard/         # Separate React admin dashboard
-|-- firebase.json            # Firebase configuration for Cloud Functions
-|-- package.json             # Main app dependencies and scripts
-`-- tailwind.config.js       # Tailwind content configuration for the main app
+|-- admin-dashboard/         # Separate admin dashboard prototype
+|-- firebase.json            # Firebase Functions config
+|-- package.json             # Root app dependencies and scripts
+`-- tailwind.config.js       # Tailwind v3 config
 ```
 
-## Main App Features
+## Core Modules
 
-- Email/password authentication through Firebase Auth.
-- Registration is restricted in code to `@softlink.com` email addresses.
-- Protected routes for dashboard, tasks, feedback, analytics, user management, resources, and notifications.
-- Firestore-backed task, feedback, user, resource, and notification data.
-- Real-time Firestore listeners for dashboard notification counts and analytics charts.
-- Firebase Storage support for resource uploads.
+| Module | Status | Notes |
+| --- | --- | --- |
+| Authentication | Implemented | Firebase login/register plus local role demo access. |
+| Dashboard | Implemented | Sidebar navigation, user info, notification count, module summaries, logout. |
+| Profile Management | Implemented | Full name, department, phone, role, bio, and local persistence. |
+| Task Management | Implemented | Task creation, assignment, status tracking, progress notes, notifications. |
+| Feedback | Implemented | Task-linked feedback, progress rating, history, notifications. |
+| Resources | Implemented | Links, file references, categories, filtering, resource notifications. |
+| Notifications | Implemented | Task, feedback, and resource updates with read/delete actions. |
+| User Management | Implemented | User directory, local user creation, role assignment. |
+| Analytics | Implemented | Task, feedback, user, and resource charts. |
 
-## Prerequisites
+## Demo Access
 
-- Node.js and npm.
-- A Firebase project with Authentication, Firestore, and Storage enabled.
-- Firebase CLI access if you want to run or deploy Cloud Functions.
-- A Firebase service account JSON file for the local backend API.
+Run the app and use one of the demo buttons on the login screen:
 
-The client Firebase configuration is currently stored directly in `src/firebase.js` and `admin-dashboard/src/firebase.js`. For a different Firebase project, update those files or migrate the config to environment variables.
+| Demo role | Email shown in app | Purpose |
+| --- | --- | --- |
+| Administrator | `admin@softlink.com` | Manage users, roles, resources, analytics, and activity. |
+| Supervisor | `supervisor@softlink.com` | Assign tasks, review work, add feedback, and share resources. |
+| Intern | `intern@softlink.com` | View assigned work, submit progress notes, access resources, and update profile. |
 
-## Install and Run the Main App
+Demo data is stored in `localStorage` under `internship-dashboard-data-v2`. It is intentionally local so reviewers can test workflows without changing production Firebase data.
+
+## Firebase Setup
+
+The client Firebase configuration currently lives in `src/firebase.js`. For another Firebase project, replace that config or move it to environment variables.
+
+Enable these Firebase services for production use:
+
+- Authentication with email/password provider.
+- Cloud Firestore for app collections.
+- Cloud Storage for uploaded resource documents.
+- Cloud Functions if using server-side custom role assignment.
+
+The local backend requires a Firebase Admin service account file at:
+
+```text
+backend/serviceAccountKey.json
+```
+
+Do not commit that file. It is ignored by `.gitignore`.
+
+## Firestore Collections
+
+The DOCX and implementation use these collections/entities:
+
+| Collection | Purpose | Key fields |
+| --- | --- | --- |
+| `users` | App user records and roles | `email`, `role`, `fullName`, `department` |
+| `profiles` | Personal profile details | `email`, `fullName`, `department`, `phone`, `role`, `bio` |
+| `tasks` | Internship work assignments | `title`, `description`, `assignedTo`, `assignedToUid`, `supervisorUid`, `status`, `deadline` |
+| `feedback` | Supervisor comments and progress evaluation | `taskId`, `comment`, `rating`, `supervisorId` |
+| `resources` | Links and document metadata | `title`, `link`, `category`, `fileName`, `uploadedBy` |
+| `notifications` | Real-time user updates | `title`, `message`, `category`, `recipientUid`, `read` |
+
+## Install and Run
 
 From the repository root:
 
@@ -59,28 +113,27 @@ npm install
 npm start
 ```
 
-The Create React App dev server opens the main app at:
+The app runs at:
 
 ```text
 http://localhost:3000
 ```
 
-Useful root scripts:
+## Verify
 
 ```bash
-npm start
 npm test -- --watchAll=false
 npm run build
 ```
 
-## Run the Local Admin API
+Current verification status:
 
-The backend exposes admin-only endpoints for user creation, listing users, and changing roles. It expects Firebase ID tokens in the `Authorization: Bearer <token>` header and checks for an `admin` custom claim.
+- `npm test -- --watchAll=false` passes.
+- `npm run build` compiles successfully.
 
-1. Download a Firebase service account JSON file from the Firebase console.
-2. Save it locally as `backend/serviceAccountKey.json`.
-3. Do not commit this file. It is ignored by `.gitignore`.
-4. Start the API:
+## Optional Local Admin API
+
+The `backend/` directory contains an Express API for Firebase Admin tasks:
 
 ```bash
 cd backend
@@ -88,70 +141,31 @@ npm install
 npm start
 ```
 
-The API runs on:
-
-```text
-http://localhost:5000
-```
-
-Available endpoints:
+It runs on `http://localhost:5000` and exposes:
 
 | Method | Path | Purpose |
 | --- | --- | --- |
-| `GET` | `/users` | List Firebase Auth users and their custom role claims. |
-| `POST` | `/create-user` | Create a Firebase Auth user and assign an initial role. |
-| `POST` | `/set-role` | Update a Firebase Auth user's custom role claim. |
+| `GET` | `/users` | List Firebase Auth users and custom role claims. |
+| `POST` | `/create-user` | Create a Firebase Auth user and assign a role. |
+| `POST` | `/set-role` | Update a Firebase Auth user's role claim. |
 
-## Run the Standalone Admin Dashboard
-
-The `admin-dashboard` app signs in with Firebase Auth and calls the local backend API on port `5000`.
-
-```bash
-cd admin-dashboard
-npm install
-npm start
-```
-
-Run the backend API in a separate terminal before using the admin dashboard's user management actions.
+The root app currently uses local demo role management for review and Firebase client registration for live accounts. Wire the root app to the backend or Cloud Function before relying on production custom-claim role changes.
 
 ## Firebase Cloud Functions
 
-The `functions` package defines a callable `setUserRole` function. It requires an authenticated caller with the `admin` custom claim and only allows the `intern`, `supervisor`, and `admin` roles.
+The `functions/` package defines a callable `setUserRole` function that only allows authenticated admins to assign `intern`, `supervisor`, or `admin` roles.
 
 ```bash
 cd functions
 npm install
 npm run serve
-```
-
-Deploy functions with:
-
-```bash
 npm run deploy
 ```
 
-The functions package currently declares Node `24` in `functions/package.json`.
+## Production Notes
 
-## Firestore Collections
-
-The app currently reads or writes these collections:
-
-| Collection | Used for |
-| --- | --- |
-| `users` | Registered user records and app-level role data. |
-| `tasks` | Assigned internship tasks. |
-| `feedback` | Supervisor feedback attached to tasks. |
-| `resources` | Shared resource records and analytics counts. |
-| `notifications` | Categorized task, feedback, and resource notifications. |
-
-## Current Development Notes
-
-- `src/pages/Resources.js` is currently incomplete and ends inside an unfinished conditional. Complete this page before expecting the root app to compile successfully.
-- `src/components/PrivateRoute.js` currently reads `user` from `useAuth()`, while `AuthContext` exposes `currentUser`. Protected routes may redirect until those names are aligned.
-- `firebase.json` is configured for Cloud Functions only. Firebase Hosting is not configured in this repo.
-
-## Security Notes
-
-- Keep Firebase Admin service account files local only.
-- Review Firestore and Storage security rules before using this project with real internship data.
-- The local backend relies on Firebase custom claims for admin authorization. Make sure only trusted users can receive the `admin` role.
+- Add and deploy Firestore and Storage security rules before storing real internship data.
+- `firebase.json` currently configures Cloud Functions only; Firebase Hosting is not configured.
+- Resource uploads in local demo mode store file names. Production file storage should upload files to Firebase Storage and persist download URLs in Firestore.
+- Role changes in local demo mode update local app data. Production role authorization should use Firebase custom claims through Cloud Functions or the backend API.
+- npm currently reports dependency audit findings from the installed tree. Review them before production deployment.

@@ -1,102 +1,89 @@
-import React, { useState, useEffect } from "react";
-import { db } from "../firebase";
-import { collection, addDoc, getDocs } from "firebase/firestore";
-import { createNotification } from "../utils/notifications";
+import { useMemo, useState } from "react";
+import AppShell from "../components/AppShell";
+import { useAppData } from "../context/AppDataContext";
+import { useAuth } from "../context/AuthContext";
 
 export default function Feedback() {
-  const [tasks, setTasks] = useState([]);
-  const [selectedTask, setSelectedTask] = useState("");
-  const [feedbackText, setFeedbackText] = useState("");
-  const [taskDetails, setTaskDetails] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [successMessage, setSuccessMessage] = useState("");
-  const [errorMessage, setErrorMessage] = useState("");
+  const { currentUser, role } = useAuth();
+  const { tasks, feedback, addFeedback } = useAppData();
+  const [taskId, setTaskId] = useState("");
+  const [comment, setComment] = useState("");
+  const [rating, setRating] = useState("4");
+  const [message, setMessage] = useState("");
 
-  const supervisorId = "supervisor123"; // Replace with AuthContext
+  const visibleTasks = role === "intern" ? tasks.filter((task) => task.assignedToUid === currentUser.uid) : tasks;
+  const selectedTask = visibleTasks.find((task) => task.id === taskId);
+  const visibleFeedback = useMemo(() => {
+    const taskIds = new Set(visibleTasks.map((task) => task.id));
+    return feedback.filter((item) => taskIds.has(item.taskId));
+  }, [feedback, visibleTasks]);
 
-  const fetchTasks = async () => {
-    const snapshot = await getDocs(collection(db, "tasks"));
-    const allTasks = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-    const filteredTasks = allTasks.filter(task => task.supervisorId === supervisorId);
-    setTasks(filteredTasks);
-  };
-
-  useEffect(() => { fetchTasks(); }, []);
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setErrorMessage(""); setSuccessMessage("");
-
-    if (!selectedTask) {
-      setErrorMessage("Please select a task.");
+  const handleSubmit = (event) => {
+    event.preventDefault();
+    setMessage("");
+    if (!taskId || !comment.trim()) {
+      setMessage("Select a task and write feedback before submitting.");
       return;
     }
-    if (!feedbackText.trim()) {
-      setErrorMessage("Feedback cannot be empty.");
-      return;
-    }
-
-    setLoading(true);
-    try {
-      await addDoc(collection(db, "feedback"), {
-        taskId: selectedTask,
-        feedbackText,
-        givenBy: supervisorId,
-        timestamp: new Date(),
-      });
-
-      await createNotification(
-        "New Feedback Received",
-        `Feedback added for Task: ${taskDetails?.title || selectedTask}`,
-        "Feedback Alerts"
-      );
-
-      setSelectedTask(""); setFeedbackText(""); setTaskDetails(null);
-      setSuccessMessage("Feedback submitted successfully!");
-    } catch (err) {
-      setErrorMessage("Error submitting feedback. Please try again.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleTaskSelect = (taskId) => {
-    setSelectedTask(taskId);
-    const task = tasks.find(t => t.id === taskId);
-    setTaskDetails(task || null);
+    addFeedback({ taskId, comment: comment.trim(), rating: Number(rating), supervisorId: currentUser.uid });
+    setComment("");
+    setTaskId("");
+    setMessage("Feedback saved and notification sent.");
   };
 
   return (
-    <div className="p-6">
-      <h2 className="text-2xl font-bold mb-4">Submit Feedback</h2>
-      <form onSubmit={handleSubmit} className="flex flex-col gap-2 max-w-lg">
-        <select value={selectedTask} onChange={(e) => handleTaskSelect(e.target.value)}
-          className="border p-2 rounded">
-          <option value="">Select a Task</option>
-          {tasks.map((task) => (
-            <option key={task.id} value={task.id}>{task.title}</option>
-          ))}
-        </select>
-
-        {taskDetails && (
-          <div className="bg-gray-100 p-3 rounded mb-2">
-            <p><strong>Title:</strong> {taskDetails.title}</p>
-            <p><strong>Description:</strong> {taskDetails.description || "No description provided"}</p>
-            <p><strong>Deadline:</strong> {taskDetails.deadline || "No deadline set"}</p>
+    <AppShell title="Feedback" description="Review work, add progress notes, and keep interns informed.">
+      <section className="split-layout">
+        <form className="panel form-panel" onSubmit={handleSubmit}>
+          <div className="panel-header"><h2>Submit feedback</h2></div>
+          <div className="field-group">
+            <label htmlFor="taskSelect">Task</label>
+            <select id="taskSelect" value={taskId} onChange={(event) => setTaskId(event.target.value)} required>
+              <option value="">Select task</option>
+              {visibleTasks.map((task) => <option key={task.id} value={task.id}>{task.title}</option>)}
+            </select>
           </div>
-        )}
+          {selectedTask ? (
+            <div className="context-box">
+              <strong>{selectedTask.assignedTo}</strong>
+              <span>{selectedTask.description || "No description provided."}</span>
+            </div>
+          ) : null}
+          <div className="field-group">
+            <label htmlFor="rating">Progress rating</label>
+            <select id="rating" value={rating} onChange={(event) => setRating(event.target.value)}>
+              <option value="5">5 - Ready</option>
+              <option value="4">4 - Strong progress</option>
+              <option value="3">3 - Needs review</option>
+              <option value="2">2 - Blocked</option>
+              <option value="1">1 - At risk</option>
+            </select>
+          </div>
+          <div className="field-group">
+            <label htmlFor="comment">Feedback comment</label>
+            <textarea id="comment" rows="5" value={comment} onChange={(event) => setComment(event.target.value)} required />
+          </div>
+          {message ? <p className={message.includes("Select") ? "form-error" : "form-success"}>{message}</p> : null}
+          <button className="button primary" type="submit">Save feedback</button>
+        </form>
 
-        <textarea placeholder="Enter feedback" value={feedbackText}
-          onChange={(e) => setFeedbackText(e.target.value)} className="border p-2 rounded" />
-
-        {errorMessage && <p className="text-red-500 text-sm">{errorMessage}</p>}
-        {successMessage && <p className="text-green-600 text-sm">{successMessage}</p>}
-
-        <button type="submit" disabled={loading}
-          className="bg-green-500 text-white py-2 rounded hover:bg-green-600 disabled:opacity-50">
-          {loading ? "Submitting..." : "Submit Feedback"}
-        </button>
-      </form>
-    </div>
+        <div className="panel list-panel">
+          <div className="panel-header"><h2>Feedback history</h2><p>{visibleFeedback.length} records</p></div>
+          <div className="stack-list roomy">
+            {visibleFeedback.map((item) => {
+              const task = tasks.find((entry) => entry.id === item.taskId);
+              return (
+                <article key={item.id} className="list-item bordered">
+                  <strong>{task?.title || "Archived task"}</strong>
+                  <span>{item.comment}</span>
+                  <small>Rating {item.rating} - {new Date(item.createdAt).toLocaleDateString()}</small>
+                </article>
+              );
+            })}
+            {visibleFeedback.length === 0 ? <p className="empty-state">No feedback has been recorded for this view.</p> : null}
+          </div>
+        </div>
+      </section>
+    </AppShell>
   );
 }

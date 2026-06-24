@@ -1,5 +1,6 @@
 import React from "react";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import "./App.css";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Dashboard from "./pages/Dashboard";
@@ -8,78 +9,37 @@ import Feedback from "./pages/Feedback";
 import Analytics from "./pages/Analytics";
 import UserManagement from "./pages/UserManagement";
 import Resources from "./pages/Resources";
-import Notifications from "./pages/Notifications";   // ✅ Import Notifications page
+import Notifications from "./pages/Notifications";
+import Profile from "./pages/Profile";
 import PrivateRoute from "./components/PrivateRoute";
+import { AppDataProvider } from "./context/AppDataContext";
 import { AuthProvider } from "./context/AuthContext";
+
+function ProtectedPage({ children }) {
+  return <PrivateRoute>{children}</PrivateRoute>;
+}
 
 function App() {
   return (
     <AuthProvider>
-      <BrowserRouter>
-        <Routes>
-          {/* Public routes */}
-          <Route path="/login" element={<Login />} />
-          <Route path="/register" element={<Register />} />
-
-          {/* Protected routes */}
-          <Route
-            path="/dashboard"
-            element={
-              <PrivateRoute>
-                <Dashboard />
-              </PrivateRoute>
-            }
-          />
-          <Route
-            path="/tasks"
-            element={
-              <PrivateRoute>
-                <Task />
-              </PrivateRoute>
-            }
-          />
-          <Route
-            path="/feedback"
-            element={
-              <PrivateRoute>
-                <Feedback />
-              </PrivateRoute>
-            }
-          />
-          <Route
-            path="/analytics"
-            element={
-              <PrivateRoute>
-                <Analytics />
-              </PrivateRoute>
-            }
-          />
-          <Route
-            path="/users"
-            element={
-              <PrivateRoute>
-                <UserManagement />
-              </PrivateRoute>
-            }
-          />
-          <Route
-            path="/resources"
-            element={
-              <PrivateRoute>
-                <Resources />
-              </PrivateRoute>
-            }
-          />
-          <Route
-            path="/notifications"
-            element={
-              <PrivateRoute>
-                <Notifications />
-              </PrivateRoute>
-            }
-          />
-        </Routes>
-      </BrowserRouter>
+      <AppDataProvider>
+        <BrowserRouter>
+          <Routes>
+            <Route path="/" element={<Navigate to="/dashboard" replace />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/register" element={<Register />} />
+            <Route path="/dashboard" element={<ProtectedPage><Dashboard /></ProtectedPage>} />
+            <Route path="/tasks" element={<ProtectedPage><Task /></ProtectedPage>} />
+            <Route path="/feedback" element={<ProtectedPage><Feedback /></ProtectedPage>} />
+            <Route path="/analytics" element={<ProtectedPage><Analytics /></ProtectedPage>} />
+            <Route path="/users" element={<ProtectedPage><UserManagement /></ProtectedPage>} />
+            <Route path="/resources" element={<ProtectedPage><Resources /></ProtectedPage>} />
+            <Route path="/notifications" element={<ProtectedPage><Notifications /></ProtectedPage>} />
+            <Route path="/profile" element={<ProtectedPage><Profile /></ProtectedPage>} />
+            <Route path="*" element={<Navigate to="/dashboard" replace />} />
+          </Routes>
+        </BrowserRouter>
+      </AppDataProvider>
     </AuthProvider>
   );
 }

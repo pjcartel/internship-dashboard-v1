@@ -1,66 +1,117 @@
+import { Link } from "react-router-dom";
+import AppShell from "../components/AppShell";
+import { useAppData } from "../context/AppDataContext";
 import { useAuth } from "../context/AuthContext";
-import { useState, useEffect } from "react";
-import { db } from "../firebase";
-import { collection, onSnapshot } from "firebase/firestore";
 
-export default function Dashboard() {
-  const { currentUser, logout } = useAuth();
-  const [unreadCount, setUnreadCount] = useState(0);
-
-  useEffect(() => {
-    // Listen to notifications collection in Firestore
-    const unsubscribe = onSnapshot(collection(db, "notifications"), (snapshot) => {
-      // Count only unread notifications (if you add a 'read' field later)
-      const count = snapshot.docs.filter(doc => !doc.data().read).length;
-      setUnreadCount(count);
-    });
-    return () => unsubscribe();
-  }, []);
-
-  return (
-    <div className="flex h-screen">
-      {/* Sidebar */}
-      <aside className="w-64 bg-gray-800 text-white p-4">
-        <h2 className="text-xl font-bold mb-6">Internship Dashboard</h2>
-        <nav>
-          <ul>
-            <li className="mb-4"><a href="/tasks">Tasks</a></li>
-            <li className="mb-4"><a href="/feedback">Feedback</a></li>
-            <li className="mb-4"><a href="/analytics">Analytics</a></li>
-            <li className="mb-4"><a href="/users">User Management</a></li>
-            <li className="mb-4"><a href="/resources">Resources</a></li>
-            <li className="mb-4 flex items-center gap-2">
-              <a href="/notifications">Notifications</a>
-              {unreadCount > 0 && (
-                <span className="bg-red-500 text-white text-xs px-2 py-1 rounded-full">
-                  {unreadCount}
-                </span>
-              )}
-            </li>
-          </ul>
-        </nav>
-      </aside>
-
-      {/* Main Content */}
-      <main className="flex-1 p-6 bg-gray-50">
-        <h1 className="text-2xl font-semibold mb-4">Welcome to your dashboard</h1>
-
-        {currentUser && (
-          <div className="mb-4">
-            <p className="text-lg">Logged in as:</p>
-            <p className="font-semibold">{currentUser.email}</p>
-          </div>
-        )}
-
-        <button
-          onClick={logout}
-          className="bg-red-500 text-white px-4 py-2 rounded"
-        >
-          Logout
-        </button>
-      </main>
-    </div>
-  );
+function statusCount(tasks, status) {
+  return tasks.filter((task) => task.status === status).length;
 }
 
-  
+export default function Dashboard() {
+  const { currentUser, role } = useAuth();
+  const { tasks, feedback, resources, notifications, users } = useAppData();
+
+  const relevantTasks = role === "intern" ? tasks.filter((task) => task.assignedToUid === currentUser.uid) : tasks;
+  const unread = notifications.filter((note) => !note.read && (note.recipientUid === "all" || note.recipientUid === currentUser.uid));
+  const dueSoon = relevantTasks.filter((task) => task.status !== "completed").slice(0, 4);
+
+  return (
+    <AppShell
+      title="Dashboard"
+      description="Track internship work, feedback, resources, and program activity from one workspace."
+    >
+      <section className="metric-row" aria-label="Program overview">
+        <div className="metric-card"><span>Total tasks</span><strong>{relevantTasks.length}</strong></div>
+        <div className="metric-card"><span>Completed</span><strong>{statusCount(relevantTasks, "completed")}</strong></div>
+        <div className="metric-card"><span>Feedback notes</span><strong>{feedback.length}</strong></div>
+        <div className="metric-card"><span>Unread updates</span><strong>{unread.length}</strong></div>
+      </section>
+
+      <section className="dashboard-grid">
+        <div className="panel large-panel">
+          <div className="panel-header">
+            <div>
+              <h2>Assigned work</h2>
+              <p>Current tasks and completion status.</p>
+            </div>
+            <Link className="text-link" to="/tasks">Open tasks</Link>
+          </div>
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr><th>Task</th><th>Owner</th><th>Status</th><th>Deadline</th></tr>
+              </thead>
+              <tbody>
+                {dueSoon.map((task) => (
+                  <tr key={task.id}>
+                    <td><strong>{task.title}</strong><span>{task.description}</span></td>
+                    <td>{task.assignedTo}</td>
+                    <td><span className={`status ${task.status}`}>{task.status}</span></td>
+                    <td>{task.deadline || "Not set"}</td>
+                  </tr>
+                ))}
+                {dueSoon.length === 0 ? <tr><td colSpan="4" className="empty-cell">No active tasks.</td></tr> : null}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div className="panel">
+          <div className="panel-header">
+            <div>
+              <h2>Notifications</h2>
+              <p>Unread items that need attention.</p>
+            </div>
+            <Link className="text-link" to="/notifications">View all</Link>
+          </div>
+          <div className="stack-list">
+            {unread.slice(0, 4).map((note) => (
+              <article key={note.id} className="list-item">
+                <strong>{note.title}</strong>
+                <span>{note.message}</span>
+              </article>
+            ))}
+            {unread.length === 0 ? <p className="empty-state">No unread notifications.</p> : null}
+          </div>
+        </div>
+
+        <div className="panel">
+          <div className="panel-header">
+            <div>
+              <h2>Resources</h2>
+              <p>Recently added learning materials.</p>
+            </div>
+            <Link className="text-link" to="/resources">Browse</Link>
+          </div>
+          <div className="stack-list">
+            {resources.slice(0, 4).map((resource) => (
+              <article key={resource.id} className="list-item">
+                <strong>{resource.title}</strong>
+                <span>{resource.category}</span>
+              </article>
+            ))}
+          </div>
+        </div>
+
+        <div className="panel">
+          <div className="panel-header">
+            <div>
+              <h2>People</h2>
+              <p>Active platform users by role.</p>
+            </div>
+            <Link className="text-link" to="/users">Manage</Link>
+          </div>
+          <div className="role-summary">
+            {[
+              ["Interns", users.filter((user) => user.role === "intern").length],
+              ["Supervisors", users.filter((user) => user.role === "supervisor").length],
+              ["Admins", users.filter((user) => user.role === "admin").length],
+            ].map(([label, count]) => (
+              <div key={label}><span>{label}</span><strong>{count}</strong></div>
+            ))}
+          </div>
+        </div>
+      </section>
+    </AppShell>
+  );
+}
