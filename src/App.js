@@ -1,6 +1,8 @@
 import React from "react";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+
 import "./App.css";
+
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Dashboard from "./pages/Dashboard";
@@ -11,10 +13,14 @@ import UserManagement from "./pages/UserManagement";
 import Resources from "./pages/Resources";
 import Notifications from "./pages/Notifications";
 import Profile from "./pages/Profile";
+import AdminDashboard from "./pages/AdminDashboard";
+
 import PrivateRoute from "./components/PrivateRoute";
+
 import { AppDataProvider } from "./context/AppDataContext";
 import { AuthProvider } from "./context/AuthContext";
 
+// Wrapper for all protected pages
 function ProtectedPage({ children }) {
   return <PrivateRoute>{children}</PrivateRoute>;
 }
@@ -25,18 +31,106 @@ function App() {
       <AppDataProvider>
         <BrowserRouter>
           <Routes>
-            <Route path="/" element={<Navigate to="/dashboard" replace />} />
+
+            {/* Default Route */}
+            <Route
+              path="/"
+              element={<Navigate to="/dashboard" replace />}
+            />
+
+            {/* Public Routes */}
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
-            <Route path="/dashboard" element={<ProtectedPage><Dashboard /></ProtectedPage>} />
-            <Route path="/tasks" element={<ProtectedPage><Task /></ProtectedPage>} />
-            <Route path="/feedback" element={<ProtectedPage><Feedback /></ProtectedPage>} />
-            <Route path="/analytics" element={<ProtectedPage><Analytics /></ProtectedPage>} />
-            <Route path="/users" element={<ProtectedPage><UserManagement /></ProtectedPage>} />
-            <Route path="/resources" element={<ProtectedPage><Resources /></ProtectedPage>} />
-            <Route path="/notifications" element={<ProtectedPage><Notifications /></ProtectedPage>} />
-            <Route path="/profile" element={<ProtectedPage><Profile /></ProtectedPage>} />
-            <Route path="*" element={<Navigate to="/dashboard" replace />} />
+
+            {/* Protected Routes */}
+
+            <Route
+              path="/dashboard"
+              element={
+                <ProtectedPage>
+                  <Dashboard />
+                </ProtectedPage>
+              }
+            />
+
+            <Route
+              path="/profile"
+              element={
+                <ProtectedPage>
+                  <Profile />
+                </ProtectedPage>
+              }
+            />
+
+            <Route
+              path="/tasks"
+              element={
+                <ProtectedPage>
+                  <Task />
+                </ProtectedPage>
+              }
+            />
+
+            <Route
+              path="/feedback"
+              element={
+                <ProtectedPage>
+                  <Feedback />
+                </ProtectedPage>
+              }
+            />
+
+            <Route
+              path="/analytics"
+              element={
+                <ProtectedPage>
+                  <Analytics />
+                </ProtectedPage>
+              }
+            />
+
+            <Route
+              path="/admin"
+              element={
+                <ProtectedPage>
+                  <AdminDashboard />
+                </ProtectedPage>
+              }
+            />
+
+            <Route
+              path="/users"
+              element={
+                <ProtectedPage>
+                  <UserManagement />
+                </ProtectedPage>
+              }
+            />
+
+            <Route
+              path="/resources"
+              element={
+                <ProtectedPage>
+                  <Resources />
+                </ProtectedPage>
+              }
+            />
+
+            <Route
+              path="/notifications"
+              element={
+                <ProtectedPage>
+                  <Notifications />
+                </ProtectedPage>
+              }
+            />
+
+            {/* Catch-all */}
+            <Route
+              path="*"
+              element={<Navigate to="/dashboard" replace />}
+            />
+
           </Routes>
         </BrowserRouter>
       </AppDataProvider>

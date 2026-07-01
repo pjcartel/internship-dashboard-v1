@@ -5,6 +5,13 @@ const cors = require("cors");
 
 const admin = require("./firebaseAdmin");
 
+require("dotenv").config();
+const path = require.resolve("./odooSync");
+console.log("Loading:", path);
+
+const odooSync = require("./odooSync");
+console.log("odooSync:", odooSync);
+
 const app = express();
 
 app.use(cors());
@@ -74,6 +81,35 @@ app.post("/set-role", verifyToken, requireAdmin, async (req, res) => {
     });
   } catch (error) {
     return res.status(500).json({
+      error: error.message,
+    });
+  }
+});
+
+/**
+ * TEST ODOO CONNECTION
+ */
+app.get("/api/odoo/test", async (req, res) => {
+  try {
+    const uid = await odooSync.authenticate();
+
+    if (!uid) {
+      return res.status(401).json({
+        success: false,
+        message: "Authentication failed",
+      });
+    }
+
+    return res.json({
+      success: true,
+      message: "Connected to Odoo successfully!",
+      uid,
+    });
+  } catch (error) {
+    console.error(error);
+
+    return res.status(500).json({
+      success: false,
       error: error.message,
     });
   }

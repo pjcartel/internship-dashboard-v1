@@ -3,6 +3,7 @@ import { useAuth } from "../context/AuthContext";
 import { useAppData } from "../context/AppDataContext";
 
 const navItems = [
+  { to: "/admin", label: "Admin Dashboard" },
   { to: "/dashboard", label: "Dashboard" },
   { to: "/tasks", label: "Tasks" },
   { to: "/feedback", label: "Feedback" },
