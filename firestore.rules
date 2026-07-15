@@ -1,0 +1,169 @@
+rules_version = '2';
+
+// ---------------------------------------------------------------------------
+// Internship Dashboard — Firestore Security Rules
+// Multi-tenant model: every application document lives under
+// /tenants/{tenantId}/... . Isolation is enforced here, not just in app code.
+//
+// Requires these Firebase Auth custom claims (set server-side, see
+// backend/middleware/auth.js):
+//   - tenantId   : string, the tenant this user belongs to
+//   - role       : one of 'admin' | 'supervisor' | 'intern'
+//   - superAdmin : boolean, true only for Softlink staff accounts
+// ---------------------------------------------------------------------------
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ---------- helpers ----------
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isSuperAdmin() {
+      return isSignedIn() && request.auth.token.superAdmin == true;
+    }
+
+    function tokenTenant() {
+      return request.auth.token.tenantId;
+    }
+
+    function tokenRole() {
+      return request.auth.token.role;
+    }
+
+    function belongsToTenant(tid) {
+      return isSignedIn() && tokenTenant() == tid;
+    }
+
+    function hasRole(tid, roles) {
+      return belongsToTenant(tid) && tokenRole() in roles;
+    }
+
+    function isSelf(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    function onlyFieldsChanged(allowed) {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(allowed);
+    }
+
+    // ---------- cross-tenant: super admin accounts ----------
+    // Managed exclusively via the Admin SDK / backend. Never client-writable.
+    match /superAdmins/{uid} {
+      allow read: if isSelf(uid) || isSuperAdmin();
+      allow write: if false;
+    }
+
+    // ---------- tenant root ----------
+    match /tenants/{tenantId} {
+      // Tenant profile (name, branding) — readable by its own members,
+      // and by super admins for onboarding/support purposes.
+      allow read: if isSuperAdmin() || belongsToTenant(tenantId);
+      // Branding may be updated by the tenant's own admin; everything else
+      // (creation, deletion) is a super-admin-only onboarding action.
+      allow update: if isSuperAdmin() ||
+        (hasRole(tenantId, ['admin']) && onlyFieldsChanged(['branding']));
+      allow create, delete: if isSuperAdmin();
+
+      // ---------- integration config (Odoo etc.) ----------
+      // Never exposed to Supervisor/Intern roles. Contains only a reference
+      // to a secret, never the raw API key (see backend for secret storage).
+      match /config/{configId} {
+        allow read: if isSuperAdmin() || hasRole(tenantId, ['admin']);
+        allow write: if isSuperAdmin();
+      }
+
+      // ---------- users ----------
+      match /users/{uid} {
+        allow read: if belongsToTenant(tenantId) || isSuperAdmin();
+        // User documents are created by the backend (Admin SDK) alongside
+        // Firebase Auth account creation — never directly by clients.
+        allow create: if false;
+        allow update: if hasRole(tenantId, ['admin']) ||
+          (isSelf(uid) && belongsToTenant(tenantId) &&
+           onlyFieldsChanged(['fullName', 'department', 'phone', 'bio']));
+        allow delete: if hasRole(tenantId, ['admin']);
+      }
+
+      // ---------- departments & cohorts ----------
+      match /departments/{deptId} {
+        allow read: if belongsToTenant(tenantId);
+        allow write: if hasRole(tenantId, ['admin']);
+      }
+
+      match /cohorts/{cohortId} {
+        allow read: if belongsToTenant(tenantId);
+        allow write: if hasRole(tenantId, ['admin']);
+      }
+
+      // ---------- tasks ----------
+      match /tasks/{taskId} {
+        allow read: if belongsToTenant(tenantId);
+        allow create: if hasRole(tenantId, ['admin', 'supervisor']);
+        allow update: if hasRole(tenantId, ['admin', 'supervisor']) ||
+          (belongsToTenant(tenantId) && tokenRole() == 'intern' &&
+           request.auth.uid == resource.data.assignedToUid &&
+           onlyFieldsChanged(['submission', 'status', 'updatedAt']));
+        allow delete: if hasRole(tenantId, ['admin', 'supervisor']);
+      }
+
+      // ---------- deliverables ----------
+      match /deliverables/{delivId} {
+        allow read: if belongsToTenant(tenantId);
+        allow create: if belongsToTenant(tenantId) && tokenRole() == 'intern';
+        allow update, delete: if hasRole(tenantId, ['admin', 'supervisor']);
+      }
+
+      // ---------- comments ----------
+      match /comments/{commentId} {
+        allow read: if belongsToTenant(tenantId);
+        allow create: if belongsToTenant(tenantId) &&
+          request.resource.data.authorUid == request.auth.uid;
+        allow update, delete: if hasRole(tenantId, ['admin']) ||
+          (belongsToTenant(tenantId) && resource.data.authorUid == request.auth.uid);
+      }
+
+      // ---------- feedback ----------
+      match /feedback/{feedbackId} {
+        allow read: if belongsToTenant(tenantId);
+        allow create, update, delete: if hasRole(tenantId, ['admin', 'supervisor']);
+      }
+
+      // ---------- resources ----------
+      match /resources/{resourceId} {
+        allow read: if belongsToTenant(tenantId);
+        allow create, update, delete: if hasRole(tenantId, ['admin', 'supervisor']);
+      }
+
+      // ---------- notifications ----------
+      match /notifications/{notifId} {
+        allow read: if belongsToTenant(tenantId) &&
+          (resource.data.recipientUid == 'all' ||
+           resource.data.recipientUid == request.auth.uid);
+        allow create: if hasRole(tenantId, ['admin', 'supervisor']);
+        // Any tenant member may mark their own (or broadcast) notification read.
+        allow update: if belongsToTenant(tenantId) &&
+          (resource.data.recipientUid == request.auth.uid ||
+           resource.data.recipientUid == 'all') &&
+          onlyFieldsChanged(['read']);
+        allow delete: if belongsToTenant(tenantId) &&
+          (resource.data.recipientUid == request.auth.uid || hasRole(tenantId, ['admin']));
+      }
+
+      // ---------- reports ----------
+      match /reports/{reportId} {
+        allow read: if hasRole(tenantId, ['admin', 'supervisor']);
+        allow write: if hasRole(tenantId, ['admin']);
+      }
+    }
+
+    // ---------- default deny ----------
+    // Anything not explicitly matched above is inaccessible. Add new
+    // collections above with an explicit rule rather than relying on this
+    // falling through permissively.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
