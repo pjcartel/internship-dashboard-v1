@@ -1,0 +1,60 @@
+rules_version = '2';
+
+// ---------------------------------------------------------------------------
+// Internship Dashboard — Storage Security Rules
+// Files are stored under /tenants/{tenantId}/resources/{fileName} so that
+// isolation matches the Firestore path structure. Requires the same custom
+// claims as firestore.rules (tenantId, role, superAdmin).
+// ---------------------------------------------------------------------------
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function belongsToTenant(tid) {
+      return isSignedIn() && request.auth.token.tenantId == tid;
+    }
+
+    function hasRole(tid, roles) {
+      return belongsToTenant(tid) && request.auth.token.role in roles;
+    }
+
+    // Max 15 MB per resource file, common document/image/video types only.
+    function isAllowedResourceFile() {
+      return request.resource.size < 15 * 1024 * 1024 &&
+        request.resource.contentType.matches('image/.*|application/pdf|'
+          + 'application/vnd.openxmlformats-officedocument.*|video/.*');
+    }
+
+    match /tenants/{tenantId}/resources/{fileName} {
+      allow read: if belongsToTenant(tenantId);
+      allow write: if hasRole(tenantId, ['admin', 'supervisor']) && isAllowedResourceFile();
+      allow delete: if hasRole(tenantId, ['admin', 'supervisor']);
+    }
+
+    // Intern deliverable uploads — interns can upload their own submissions,
+    // but not overwrite or delete once graded (enforced together with the
+    // corresponding Firestore deliverables rules, which lock status server-side).
+    match /tenants/{tenantId}/deliverables/{taskId}/{fileName} {
+      allow read: if belongsToTenant(tenantId);
+      allow write: if belongsToTenant(tenantId) &&
+        (request.auth.token.role == 'intern' || request.auth.token.role in ['admin', 'supervisor']) &&
+        request.resource.size < 25 * 1024 * 1024;
+      allow delete: if hasRole(tenantId, ['admin', 'supervisor']);
+    }
+
+    // Per-tenant branding assets (logo, etc.) — admin-managed only.
+    match /tenants/{tenantId}/branding/{fileName} {
+      allow read: if belongsToTenant(tenantId);
+      allow write, delete: if hasRole(tenantId, ['admin']);
+    }
+
+    // Default deny for anything else in the bucket.
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}
